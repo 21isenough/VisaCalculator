@@ -1,0 +1,103 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+
+<h1>Register</h1>
+{% from "includes/_formhelpers.html" import render_field %}
+<form method="POST" action="">
+  <div class="form-group">
+    {{render_field(form.startdate, class_="form-control", type="date")}}
+  </div>
+  <div class="form-group">
+    {{render_field(form.name, class_="form-control")}}
+  </div>
+  <div class="form-group">
+    {{render_field(form.email, class_="form-control")}}
+  </div>
+  <div class="form-group">
+    {{render_field(form.username, class_="form-control")}}
+  </div>
+  <div class="form-group">
+    {{render_field(form.password, class_="form-control")}}
+  </div>
+  <div class="form-group">
+    {{render_field(form.confirm, class_="form-control")}}
+  </div>
+  <p><input type="submit" class="btn btn-primary" value="Submit"></p>
+</form>
+{% endblock %}
+
+
+
+
+    <!--------------- OLD FILE -------------->
+    <!--------------- Contact Area -------------->
+    <!-- <div id="contact-area" class="section section-padding-extra contact-area">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 col-md-offset-3 text-center">
+                    <div class="section-heading">
+                        <h2 class="section-title">Register</h2>
+                        {% from "includes/_formhelpers.html" import render_field %}
+                        <p class="section-subtitle">Register on VisaCalc to save your data</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2">
+                    <!-- <form id="contactForm" class="contact-form wow animated fadeInUp" data-wow-duration="1.5s" action="" method="POST"> -->
+                    <!-- <form class="contact-form wow animated fadeInUp" data-wow-duration="1.5s" action="" method="POST">
+                        <div class="row">
+                            <div class="col-sm-6">{{render_field(form.name)}}</div>
+                            <div class="col-sm-6">{{render_field(form.email, class_="form-control")}}</div>
+                            <div class="col-sm-12">{{render_field(form.username, class_="form-control")}}</div>
+                            <div class="col-sm-6">{{render_field(form.password, class_="form-control")}}</div>
+                            <div class="col-sm-6">{{render_field(form.confirm, class_="form-control")}}</div>
+                            <div class="col-sm-12 text-center">
+                                <button class="btn" type="submit" value="Submit">Register</button>
+                            </div> -->
+
+
+                            <!-- <div class="col-sm-6"><input id="name" type="text" name="name" placeholder="Name" required></div>
+                            <div class="col-sm-6"><input id="email" type="email" name="email" placeholder="Email" required></div>
+                            <div class="col-sm-12"><input id="subject" type="text" name="subject" placeholder="Subject" required></div>
+                            <div class="col-sm-12"><textarea id="message" placeholder="Message" rows="4" required></textarea></div>
+                            <div class="col-sm-12 text-center">
+                                <button class="btn" type="submit" value="Submit">Submit Message</button>
+                            </div>
+                            <div class="col-md-12 text-center">
+                                <p class="input-success">We have received your mail, We will get back to you soon!</p>
+                                <p class="input-error">Sorry, Message could not send! Please try again.</p>
+                            </div> -->
+                        <!-- </div>
+                    </form>
+                </div>
+            </div>
+            <div class="row">
+                <div class="contact-infos">
+                    <div class="col-sm-4 text-center">
+                        <div class="contact-item wow animated fadeInUp" data-wow-duration="1.5s">
+                            <span class="contact-icon"><i class="fa fa-map-marker"></i></span>
+                            <p class="contact-detail">68 Dohava Strees, Lorem isput Spusts <br/>New York, United State</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4 text-center">
+                        <div class="contact-item wow animated fadeInUp" data-wow-delay="0.5s" data-wow-duration="1.5s">
+                            <span class="contact-icon"><i class="fa fa-envelope"></i></span>
+                            <p class="contact-detail">info@geo.com<br/>support@geo.com</p>
+                        </div>
+                    </div>
+                    <div class="col-sm-4 text-center">
+                        <div class="contact-item wow animated fadeInUp" data-wow-delay="1s" data-wow-duration="1.5s">
+                            <span class="contact-icon"><i class="fa fa-phone"></i></span>
+                            <p class="contact-detail">+123-456-7890 - Central Office<br/>+123-456-7890 - Fax</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="map-section" class="section">
+        <div class="google-map" id="location" data-lat="23.75043" data-lng="90.38844" data-zoom="16" style="height: 330px"></div>
+    </div>
+</div> -->
