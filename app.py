@@ -9,6 +9,15 @@ from flask import (
     logging,
 )
 
+import locale
+import uuid
+import random
+import config
+from datetime import date
+
+locale.setlocale(locale.LC_ALL, "de_DE.UTF-8")
+
+
 # from data import Articles
 
 from flask_mysqldb import MySQL
@@ -22,9 +31,9 @@ app = Flask(__name__)
 
 # Config MySQL
 app.config["MYSQL_HOST"] = "localhost"
-app.config["MYSQL_USER"] = "root"
-app.config["MYSQL_PASSWORD"] = "########"
-app.config["MYSQL_DB"] = "mytripsapp"
+app.config["MYSQL_USER"] = config.MYSQL_USER
+app.config["MYSQL_PASSWORD"] = config.MYSQL_PASSWORD
+app.config["MYSQL_DB"] = config.MYSQL_DB
 # Return Database querries as dict rather than tup
 app.config["MYSQL_CURSORCLASS"] = "DictCursor"
 
@@ -40,7 +49,7 @@ def is_logged_in(f):
         if "logged_in" in session:
             return f(*args, **kwargs)
         else:
-            flash("Not authorized, please log in", "danger")
+            flash("Zugriff nicht gestattet, bitte einloggen.", "danger")
             return redirect(url_for("login"))
 
     return wrap
@@ -52,94 +61,18 @@ def index():
     return render_template("index.html")
 
 
-# About
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-
-# Articles overview
-@app.route("/articles")
-@is_logged_in
-def articles():
-    # Create cursor
-    cur = mysql.connection.cursor()
-
-    result = cur.execute(
-        "SELECT * FROM articles WHERE author=%s", [session["username"]]
-    )
-
-    articles = cur.fetchall()
-
-    if result > 0:
-        return render_template("articles.html", articles=articles)
-    else:
-        msg = "No articles found"
-        return render_template("articles.html", msg=msg)
-    # Close connection
-    cur.close()
-
-
-# Single Articles
-@app.route("/article/<string:id>/")
-def article(id):
-    # Create cursor
-    cur = mysql.connection.cursor()
-
-    result = cur.execute("SELECT * FROM articles WHERE id=%s", [id])
-
-    article = cur.fetchone()
-
-    # Close connection
-    cur.close()
-
-    return render_template("article.html", article=article)
-
-
-# Articles overview
-@app.route("/trips")
-@is_logged_in
-def trips():
-    # Create cursor
-    cur = mysql.connection.cursor()
-
-    result = cur.execute("SELECT * FROM trips")
-
-    trips = cur.fetchall()
-
-    if result > 0:
-        days = 0
-        for trip in trips:
-            duration = (trip["enddate"] - trip["startdate"]).days
-            app.logger.info(days)
-            days += duration
-
-        return render_template("trips.html", trips=trips, days=days)
-    else:
-        msg = "No trips found"
-        return render_template("trips.html", msg=msg)
-    # Close connection
-    cur.close()
-
-
-@app.route("/contact")
-def contact():
-    return render_template("contact.html")
-
-
 # Register Form Class
 class RegisterForm(Form):
-    name = StringField("Name", [validators.Length(min=1, max=50)])
-    username = StringField("Username", [validators.Length(min=4, max=25)])
-    email = StringField("Email", [validators.Length(min=6, max=50)])
+    email = StringField("E-Mail", [validators.Length(min=4, max=100)])
+    username = StringField("Benutzername", [validators.Length(min=4, max=30)])
     password = PasswordField(
-        "Password",
+        "Passwort",
         [
             validators.DataRequired(),
             validators.EqualTo("confirm", message="Passwords do not match"),
         ],
     )
-    confirm = PasswordField("Confirm Password")
+    confirm = PasswordField("Passwort wiederholen")
 
 
 # User Register
@@ -147,7 +80,6 @@ class RegisterForm(Form):
 def register():
     form = RegisterForm(request.form)
     if request.method == "POST" and form.validate():
-        name = form.name.data
         email = form.email.data
         username = form.username.data
         password = sha256_crypt.encrypt(str(form.password.data))
@@ -156,8 +88,8 @@ def register():
         cur = mysql.connection.cursor()
 
         cur.execute(
-            "INSERT INTO users(name, email, username, password) VALUES(%s, %s, %s, %s)",
-            (name, email, username, password),
+            "INSERT INTO users(id, email, username, password) VALUES(%s, %s, %s, %s)",
+            (uuid.uuid4(), email, username, password),
         )
 
         # Comit to DB
@@ -166,9 +98,10 @@ def register():
         # Close connection
         cur.close()
 
-        flash("You are now registered and can log in", "success")
+        flash("Du bist jetzt registiert und kannst dich einloggen.", "success")
 
         return redirect(url_for("index"))
+
     return render_template("register.html", form=form)
 
 
@@ -185,7 +118,7 @@ def login():
         # Get user by username
         result = cur.execute("SELECT * FROM users WHERE username = %s", [username])
 
-        if result > 0:
+        if result:
             # Get stored hash
             data = cur.fetchone()
             password = data["password"]
@@ -195,18 +128,20 @@ def login():
                 # Passed
                 session["logged_in"] = True
                 session["username"] = username
+                session["id"] = data["id"]
 
-                flash("You are now logged in", "success")
-                return redirect(url_for("index"))
+                flash("Du bist jetzt eingeloggt", "success")
+                return redirect(url_for("aufenthalte"))
 
             else:
-                error = "Invalid login"
-                return render_template("login.html", error=error)
+                flash("Passwort nicht korrekt.", "danger")
+                return render_template("login.html")
             # Close connection
             cur.close()
         else:
-            error = "Username not found"
-            return render_template("login.html", error=error)
+            # error = "Username not found"
+            flash("Username nicht registiert.", "danger")
+            return render_template("login.html")
 
     return render_template("login.html")
 
@@ -216,54 +151,83 @@ def login():
 @is_logged_in
 def logout():
     session.clear()
-    flash("Your are now logged out", "success")
+    flash("Ciao. Du bist jetzt wieder ausgeloggt.", "success")
     return redirect(url_for("login"))
-
-
-# Dashboard
-@app.route("/dashboard")
-@is_logged_in
-def dashboard():
-    # Create cursor
-    cur = mysql.connection.cursor()
-
-    result = cur.execute(
-        "SELECT * FROM articles WHERE author=%s", [session["username"]]
-    )
-
-    articles = cur.fetchall()
-
-    if result > 0:
-        return render_template("dashboard.html", articles=articles)
-    else:
-        msg = "No articles found"
-        return render_template("dashboard.html", msg=msg)
-    # Close connection
-    cur.close()
 
 
 # Trip Form Class
 class TripForm(Form):
-    startdate = DateField("Startdate", format="%Y-%m-%d")
-    enddate = DateField("Enddate", format="%Y-%m-%d")
+    startdate = DateField("Einreisedatum", format="%Y-%m-%d")
+    enddate = DateField("Ausreisedatum", format="%Y-%m-%d")
+    comment = StringField("Kommentar", [validators.Length(min=1, max=200)])
 
 
-# Add trip
-@app.route("/add_trip", methods=["GET", "POST"])
+# Trip overview
+@app.route("/aufenthalte")
 @is_logged_in
-def add_trip():
+def aufenthalte():
+    # Create cursor
+    cur = mysql.connection.cursor()
+
+    app.logger.info(session["id"])
+    result = cur.execute(
+        "SELECT * FROM aufenthalte WHERE owner = %s ORDER BY startdate ASC",
+        [session["id"]],
+    )
+
+    aufenthalte = cur.fetchall()
+
+    if result:
+
+        vergangene_aufenthalte = []
+        zukuenftige_aufenthalte = []
+
+        for aufenthalt in aufenthalte:
+            startdate_heute = (date.today() - aufenthalt["startdate"]).days
+            enddate_heute = (date.today() - aufenthalt["enddate"]).days
+            print(startdate_heute, enddate_heute)
+
+            if (date.today() - aufenthalt["startdate"]).days >= 180:
+                print("Woho")
+
+        if result:
+            days = 0
+            for aufenthalt in aufenthalte:
+                duration = (aufenthalt["enddate"] - aufenthalt["startdate"]).days
+                app.logger.info(type(aufenthalt["enddate"]))
+                app.logger.info(type(aufenthalte))
+                days += duration
+                days += 1
+
+        return render_template("aufenthalte.html", aufenthalte=aufenthalte, days=days)
+    else:
+        msg = "Keine Aufenthalt gefunden..."
+        return render_template("aufenthalte.html", msg=msg)
+    # Close connection
+    cur.close()
+
+
+# Add aufenthalt
+@app.route("/aufenthalt_hinzufuegen", methods=["GET", "POST"])
+@is_logged_in
+def aufenthalt_hinzufuegen():
     form = TripForm(request.form)
     if request.method == "POST" and form.validate():
         startdate = form.startdate.data
         enddate = form.enddate.data
+        comment = form.comment.data
+
+        if startdate > enddate:
+            flash("Das Einreisedatum muss vor dem Ausreisedatum liegen.", "danger")
+            return redirect(url_for("aufenthalt_hinzufuegen"))
 
         # Create cursor
         cur = mysql.connection.cursor()
 
         # Execute
         cur.execute(
-            "INSERT INTO trips(startdate, enddate) VALUES(%s, %s)",
-            (startdate, enddate),
+            "INSERT INTO aufenthalte(uid, owner, startdate, enddate, comment) VALUES(%s, %s, %s, %s, %s)",
+            (IDGenerator().generate_id(), session["id"], startdate, enddate, comment),
         )
 
         # Commit to DB
@@ -272,103 +236,22 @@ def add_trip():
         # Close connection
         cur.close()
 
-        flash("Trip created", "success")
+        flash("Aufenthalt erfolgreich hinzugefügt", "success")
 
-        return redirect(url_for("trips"))
+        return redirect(url_for("aufenthalte"))
 
-    return render_template("add_trip.html", form=form)
-
-
-# Article Form Class
-class ArticleForm(Form):
-    title = StringField("Title", [validators.Length(min=1, max=200)])
-    body = TextAreaField("Body", [validators.Length(min=30)])
+    return render_template("aufenthalt_hinzufuegen.html", form=form)
 
 
-# Add article
-@app.route("/add_article", methods=["GET", "POST"])
+# Delete Aufenthalt
+@app.route("/delete_aufenthalt/<string:uid>/", methods=["POST"])
 @is_logged_in
-def add_article():
-    form = ArticleForm(request.form)
-    if request.method == "POST" and form.validate():
-        title = form.title.data
-        body = form.body.data
-
-        # Create cursor
-        cur = mysql.connection.cursor()
-
-        # Execute
-        cur.execute(
-            "INSERT INTO articles(title, body, author) VALUES(%s, %s, %s)",
-            (title, body, session["username"]),
-        )
-
-        # Commit to DB
-        mysql.connection.commit()
-
-        # Close connection
-        cur.close()
-
-        flash("Article created", "success")
-
-        return redirect(url_for("dashboard"))
-
-    return render_template("add_article.html", form=form)
-
-
-# Edit article
-@app.route("/edit_article/<string:id>/", methods=["GET", "POST"])
-@is_logged_in
-def edit_article(id):
-    # Create cursor
-    cur = mysql.connection.cursor()
-
-    # Get article by id
-    result = cur.execute("SELECT * FROM articles WHERE id = %s", [id])
-
-    article = cur.fetchone()
-
-    # Get form
-    form = ArticleForm(request.form)
-
-    # Populate article form fields
-    form.title.data = article["title"]
-    form.body.data = article["body"]
-
-    if request.method == "POST" and form.validate():
-        title = request.form["title"]
-        body = request.form["body"]
-
-        # Create cursor
-        cur = mysql.connection.cursor()
-
-        # Execute
-        cur.execute(
-            "UPDATE articles SET title=%s, body=%s WHERE id=%s", (title, body, id)
-        )
-
-        # Commit to DB
-        mysql.connection.commit()
-
-        # Close connection
-        cur.close()
-
-        flash("Article updated ", "success")
-
-        return redirect(url_for("dashboard"))
-
-    return render_template("edit_article.html", form=form)
-
-
-# Delete Articles
-@app.route("/delete_article/<string:id>/", methods=["POST"])
-@is_logged_in
-def delete_article(id):
+def delete_aufenthalt(uid):
     # Create cursor
     cur = mysql.connection.cursor()
 
     # Delet article by id
-    cur.execute("DELETE FROM articles WHERE id = %s", [id])
+    cur.execute("DELETE FROM aufenthalte WHERE uid = %s", [uid])
 
     # Commit to DB
     mysql.connection.commit()
@@ -376,11 +259,42 @@ def delete_article(id):
     # Close connection
     cur.close()
 
-    flash("Article deleted ", "success")
+    flash("Aufenthalt erfolgreich gelöscht.", "success")
 
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("aufenthalte"))
+
+
+# Random ID generator for trip IDs
+class IDGenerator(object):
+    ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+    def __init__(self, length=8):
+        self._alphabet_length = len(self.ALPHABET)
+        self._id_length = length
+
+    def _encode_int(self, n):
+        # Adapted from:
+        #   Source: https://stackoverflow.com/a/561809/1497596
+        #   Author: https://stackoverflow.com/users/50902/kmkaplan
+
+        encoded = ""
+        while n > 0:
+            n, r = divmod(n, self._alphabet_length)
+            encoded = self.ALPHABET[r] + encoded
+        return encoded
+
+    def generate_id(self):
+        """Generate an ID without leading zeros.
+
+        For example, for an ID that is eight characters in length, the
+        returned values will range from '10000000' to 'zzzzzzzz'.
+        """
+
+        start = self._alphabet_length ** (self._id_length - 1)
+        end = self._alphabet_length ** self._id_length - 1
+        return self._encode_int(random.randint(start, end))
 
 
 if __name__ == "__main__":
-    app.secret_key = "secret123"
+    app.secret_key = config.SECRET_KEY
     app.run(debug=True, host="0.0.0.0", port="5000")
