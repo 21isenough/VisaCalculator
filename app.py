@@ -14,9 +14,7 @@ from flask import (
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 
-from wtforms.fields.html5 import DateField  # <-- for Datefields
-from datetime import date
-
+from wtforms.fields.html5 import DateField
 from passlib.hash import sha256_crypt
 from functools import wraps
 
@@ -98,6 +96,32 @@ def article(id):
     return render_template("article.html", article=article)
 
 
+# Articles overview
+@app.route("/trips")
+@is_logged_in
+def trips():
+    # Create cursor
+    cur = mysql.connection.cursor()
+
+    result = cur.execute("SELECT * FROM trips")
+
+    trips = cur.fetchall()
+
+    if result > 0:
+        days = 0
+        for trip in trips:
+            duration = (trip["enddate"] - trip["startdate"]).days
+            app.logger.info(days)
+            days += duration
+
+        return render_template("trips.html", trips=trips, days=days)
+    else:
+        msg = "No trips found"
+        return render_template("trips.html", msg=msg)
+    # Close connection
+    cur.close()
+
+
 @app.route("/contact")
 def contact():
     return render_template("contact.html")
@@ -105,9 +129,6 @@ def contact():
 
 # Register Form Class
 class RegisterForm(Form):
-    startdate = DateField(
-        "DatePicker", format="%Y-%m-%d", default=date.today()
-    )  # <-- for Datefields
     name = StringField("Name", [validators.Length(min=1, max=50)])
     username = StringField("Username", [validators.Length(min=4, max=25)])
     email = StringField("Email", [validators.Length(min=6, max=50)])
@@ -221,6 +242,43 @@ def dashboard():
     cur.close()
 
 
+# Trip Form Class
+class TripForm(Form):
+    startdate = DateField("Startdate", format="%Y-%m-%d")
+    enddate = DateField("Enddate", format="%Y-%m-%d")
+
+
+# Add trip
+@app.route("/add_trip", methods=["GET", "POST"])
+@is_logged_in
+def add_trip():
+    form = TripForm(request.form)
+    if request.method == "POST" and form.validate():
+        startdate = form.startdate.data
+        enddate = form.enddate.data
+
+        # Create cursor
+        cur = mysql.connection.cursor()
+
+        # Execute
+        cur.execute(
+            "INSERT INTO trips(startdate, enddate) VALUES(%s, %s)",
+            (startdate, enddate),
+        )
+
+        # Commit to DB
+        mysql.connection.commit()
+
+        # Close connection
+        cur.close()
+
+        flash("Trip created", "success")
+
+        return redirect(url_for("trips"))
+
+    return render_template("add_trip.html", form=form)
+
+
 # Article Form Class
 class ArticleForm(Form):
     title = StringField("Title", [validators.Length(min=1, max=200)])
@@ -325,4 +383,4 @@ def delete_article(id):
 
 if __name__ == "__main__":
     app.secret_key = "secret123"
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port="5000")
