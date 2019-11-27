@@ -13,7 +13,7 @@ import locale
 import uuid
 import random
 import config
-from datetime import date
+from datetime import date, timedelta
 
 locale.setlocale(locale.LC_ALL, "de_DE.UTF-8")
 
@@ -157,9 +157,12 @@ def logout():
 
 # Trip Form Class
 class TripForm(Form):
-    startdate = DateField("Einreisedatum", format="%Y-%m-%d")
-    enddate = DateField("Ausreisedatum", format="%Y-%m-%d")
-    comment = StringField("Kommentar", [validators.Length(min=1, max=200)])
+    startdate = DateField("Einreisedatum")
+    enddate = DateField("Ausreisedatum")
+    comment = StringField("Kommentar")
+    # startdate = DateField("Einreisedatum", format="%Y-%m-%d")
+    # enddate = DateField("Ausreisedatum", format="%Y-%m-%d")
+    # comment = StringField("Kommentar", [validators.Length(max=255)])
 
 
 # Trip overview
@@ -179,27 +182,93 @@ def aufenthalte():
 
     if result:
 
+        today = date.today()
+        stichtag = date.today() - timedelta(days=180)
+        aufenthaltstage = 0
+
+        for aufenthalt in aufenthalte:
+            delta_startdate = (stichtag - aufenthalt["startdate"]).days
+            delta_enddate = (stichtag - aufenthalt["enddate"]).days
+
+            if delta_startdate and delta_enddate > 0:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Both dates more than 180 days ago - days don't matter."
+                )
+            elif delta_startdate >= 0 and delta_enddate <= 0:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Enddate matters, less than 180 days ago -> delta_enddate"
+                )
+                aufenthaltstage += (delta_enddate * -1) + 1
+                aufenthalt["relevants"] = (delta_enddate * -1) + 1
+                print(aufenthalt["relevants"])
+            elif delta_startdate == 0 and delta_enddate == 0:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Both dates exactly 180 days ago - count 1 day!"
+                )
+                aufenthaltstage += 1
+            elif 0 >= delta_startdate >= -180 and 0 >= delta_enddate >= -180:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Both dates between 180 days ago  - count duration"
+                )
+                aufenthaltstage += delta_startdate + (delta_enddate * -1) + 1
+            elif delta_startdate >= -180 and delta_enddate <= -180:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Startdate matters, less than 180 days ago -> delta_startdate"
+                )
+                aufenthaltstage += delta_startdate + 181
+                aufenthalt["relevants"] = delta_startdate + 181
+                print(aufenthalt["relevants"])
+            elif delta_startdate == -180 and delta_enddate == -180:
+                print(str(aufenthalt["uid"]) + "Both dates today - count 1 day!")
+                aufenthaltstage += 1
+            elif delta_startdate and delta_enddate < -180:
+                print(
+                    str(aufenthalt["uid"])
+                    + " - Both dates in the future - days don't matter."
+                )
+                print(delta_startdate)
+                print(delta_enddate)
+
+        prozent_verbraucht = round((aufenthaltstage / 90) * 100)
+
         vergangene_aufenthalte = []
         zukuenftige_aufenthalte = []
+        days_zukuenftige_aufenthalte = 0
+        days_vergangene_aufenthalte = 0
 
         for aufenthalt in aufenthalte:
             startdate_heute = (date.today() - aufenthalt["startdate"]).days
             enddate_heute = (date.today() - aufenthalt["enddate"]).days
-            print(startdate_heute, enddate_heute)
+            print(startdate_heute)
+            print(enddate_heute)
 
-            if (date.today() - aufenthalt["startdate"]).days >= 180:
-                print("Woho")
-
-        if result:
-            days = 0
-            for aufenthalt in aufenthalte:
+            if startdate_heute <= 0 and enddate_heute <= 0:
+                zukuenftige_aufenthalte.append(aufenthalt)
                 duration = (aufenthalt["enddate"] - aufenthalt["startdate"]).days
-                app.logger.info(type(aufenthalt["enddate"]))
-                app.logger.info(type(aufenthalte))
-                days += duration
-                days += 1
+                days_zukuenftige_aufenthalte += duration
+                days_zukuenftige_aufenthalte += 1
+            else:
+                vergangene_aufenthalte.append(aufenthalt)
+                duration = (aufenthalt["enddate"] - aufenthalt["startdate"]).days
+                days_vergangene_aufenthalte += duration
+                days_vergangene_aufenthalte += 1
 
-        return render_template("aufenthalte.html", aufenthalte=aufenthalte, days=days)
+        return render_template(
+            "aufenthalte.html",
+            vergangene_aufenthalte=vergangene_aufenthalte,
+            zukuenftige_aufenthalte=zukuenftige_aufenthalte,
+            days_zukuenftige_aufenthalte=days_zukuenftige_aufenthalte,
+            days_vergangene_aufenthalte=days_vergangene_aufenthalte,
+            stichtag=stichtag,
+            aufenthaltstage=aufenthaltstage,
+            prozent_verbraucht=prozent_verbraucht,
+            today=today,
+        )
     else:
         msg = "Keine Aufenthalt gefunden..."
         return render_template("aufenthalte.html", msg=msg)
@@ -220,7 +289,16 @@ def aufenthalt_hinzufuegen():
         if startdate > enddate:
             flash("Das Einreisedatum muss vor dem Ausreisedatum liegen.", "danger")
             return redirect(url_for("aufenthalt_hinzufuegen"))
-
+        if ((date.today() - enddate).days) <= 0:
+            print(enddate - date.today())
+            flash("Das Ausreisedatum muss in der Vergangenheit liegen.", "danger")
+            return redirect(url_for("aufenthalt_hinzufuegen"))
+        if (enddate - startdate).days > 90:
+            flash(
+                "Der Zeitraum zwischen den beiden Daten darf nicht mehr als 90 Tage betragen.",
+                "danger",
+            )
+            return redirect(url_for("aufenthalt_hinzufuegen"))
         # Create cursor
         cur = mysql.connection.cursor()
 

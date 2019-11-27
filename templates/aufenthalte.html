@@ -2,7 +2,7 @@
 
 {% block body %}
   <h1>Türkei Reisen <small>Guten Tag, {{session.username}}</small></h1>
-  <a class="btn btn-success" href="/aufenthalt_hinzufuegen">Aufenthalt hinzufügen</a>
+  <a class="btn btn-warning" href="/aufenthalt_hinzufuegen">Aufenthalt hinzufügen</a>
   <hr>
   {% if msg %}
   <div class="alert alert-info">
@@ -11,72 +11,158 @@
   {% endif %}
   {% if not msg %}
 
-  <h4>Vergangene Aufenthalte</h4>
+  {% if vergangene_aufenthalte %}
+  <h4>Aktuelle und vergangene Aufenthalte</h4>
+  <h6>Aufenthalte sind hier geliestet, wenn das Einreisedatum in der Vergangenheit liegt.</h6>
   <table class="table table-striped table-hover">
     <tr>
-      <th>Einreisedatum <span class="glyphicon glyphicon-triangle-bottom"></span></th>
-      <th>Ausreisedatum</th>
+      <th width="20%">Einreisedatum <span class="glyphicon glyphicon-triangle-bottom"></span></th>
+      <th width="20%">Ausreisedatum</th>
       <th>Aufenthalt in Tagen</th>
-      <th>Kommentar</th>
-      <th></th>
+      <th width="10%"></th>
+      <th width="10%"></th>
     </tr>
-    {% for aufenthalt in aufenthalte %}
+    {% for aufenthalt in vergangene_aufenthalte %}
       <tr>
         <td>{{aufenthalt.startdate.strftime("%d %B %Y")}}</td>
         <td>{{aufenthalt.enddate.strftime("%d %B %Y")}}</td>
-        <td>{{ (aufenthalt.enddate - aufenthalt.startdate).days + 1 }}</td>
+        <td>
+          {{ (aufenthalt.enddate - aufenthalt.startdate).days + 1 }}
+          {% if aufenthalt.relevants == 1 %}
+            <span class="glyphicon glyphicon-info-sign my-tooltip" title="Nur {{aufenthalt.relevants}} Tag für die Berechnung relevant." aria-hidden="true"></span>
+          {% elif aufenthalt.relevants > 1 %}
+          <span class="glyphicon glyphicon-info-sign my-tooltip" title="Nur {{aufenthalt.relevants}} Tage für die Berechnung relevant." aria-hidden="true"></span>
+          {% endif %}
+        </td>
         <td>
           {% if aufenthalt.comment %}
-            <a href="#" data-toggle="tooltip" title="{{ aufenthalt.comment }}">{{ aufenthalt.comment | string | truncate(40) }}</a>
+              <button type="button" class="btn btn-secondary" data-toggle="tooltip" data-placement="bottom" title="{{ aufenthalt.comment | string}}">
+                Kommentar
+              </button>
           {% endif %}
         </td>
         <td>
           <form action="{{url_for('delete_aufenthalt', uid=aufenthalt.uid)}}" method="post">
             <input type="hidden" name="_method" value="DELETE">
-            <input type="submit" value="Löschen" class="btn btn-warning">
+            <input type="submit" value="Löschen" class="btn btn-success">
           </form>
         </td>
       </tr>
     {% endfor %}
       <tr>
         <td></td>
-        <td>Total</td>
-        <td>{{days}}</td>
+        <td></td>
+        <td></td>
         <td></td>
         <td></td>
       </tr>
   </table>
+  {% endif %}
 
-  <div class="progress">
-  <div class="progress-bar progress-bar-success progress-bar-striped active" role="progressbar"
-  aria-valuenow="30" aria-valuemin="0" aria-valuemax="100" style="width:30%">
-    30% Complete (success)
+  {% if zukuenftige_aufenthalte %}
+  <h4>Aktuelle und zukünftige Aufenthalte</h4>
+  <h6>Aufenthalte sind hier geliestet, wenn das Ausreisedatum in der Zukunft liegt.</h6>
+  <table class="table table-striped table-hover">
+    <tr>
+      <th width="20%">Einreisedatum <span class="glyphicon glyphicon-triangle-bottom"></span></th>
+      <th width="20%">Ausreisedatum</th>
+      <th>Aufenthalt in Tagen</th>
+      <th width="10%"></th>
+      <th width="10%"></th>
+    </tr>
+    {% for aufenthalt in zukuenftige_aufenthalte %}
+      <tr>
+        <td>{{aufenthalt.startdate.strftime("%d %B %Y")}}</td>
+        <td>{{aufenthalt.enddate.strftime("%d %B %Y")}}</td>
+        <td>
+          {{ (aufenthalt.enddate - aufenthalt.startdate).days + 1 }}
+          {% if aufenthalt.relevants == 1 %}
+            <span class="glyphicon glyphicon-info-sign my-tooltip" title="Nur {{aufenthalt.relevants}} Tag für die Berechnung relevant." aria-hidden="true"></span>
+          {% elif aufenthalt.relevants > 1 %}
+          <span class="glyphicon glyphicon-info-sign my-tooltip" title="Nur {{aufenthalt.relevants}} Tage für die Berechnung relevant." aria-hidden="true"></span>
+          {% endif %}
+        </td>
+        <td>
+          {% if aufenthalt.comment %}
+              <button type="button" class="btn btn-secondary" data-toggle="tooltip" data-placement="bottom" title="{{ aufenthalt.comment | string}}">
+                Kommentar
+              </button>
+          {% endif %}
+        </td>
+        <td>
+          <form action="{{url_for('delete_aufenthalt', uid=aufenthalt.uid)}}" method="post">
+            <input type="hidden" name="_method" value="DELETE">
+            <input type="submit" value="Löschen" class="btn btn-success">
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+      <tr>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+  </table>
+  {% endif %}
+
+  <div align="center" class="alert alert-success" role="alert">
+    Heute ist der  <b>{{today.strftime("%d %B %Y")}}</b> <br> Vor 180 Tagen war der <b>{{stichtag.strftime("%d %B %Y")}}.</b><br>
+    In diesen 180 Tagen hast du dich <b>{{ aufenthaltstage }} Tage</b> in der Türkei aufgehalten.
   </div>
-</div>
 
-<div class="progress">
-  <div class="progress-bar progress-bar-info progress-bar-striped active" role="progressbar"
-  aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width:50%">
-    50% Complete (info)
+{% if prozent_verbraucht > 25 %}
+  {% if prozent_verbraucht < 50 %}
+  <div class="progress" style="height: 24px;">
+    <div class="progress-bar progress-bar-success progress-bar-striped active" role="progressbar"
+  aria-valuenow="{{prozent_verbraucht}}" aria-valuemin="0" aria-valuemax="100" style="width:{{prozent_verbraucht}}%; font-size: 16px">
+    {{prozent_verbraucht}}% der 90 Tage sind aufgebraucht.
+    </div>
   </div>
-</div>
 
-<div class="progress">
-  <div class="progress-bar progress-bar-warning progress-bar-striped active" role="progressbar"
-  aria-valuenow="70" aria-valuemin="0" aria-valuemax="100" style="width:70%">
-    70% Complete (warning)
+  {% elif prozent_verbraucht < 70 %}
+
+  <div class="progress" style="height: 24px;">
+    <div class="progress-bar progress-bar-info progress-bar-striped active" role="progressbar"
+  aria-valuenow="{{prozent_verbraucht}}" aria-valuemin="0" aria-valuemax="100" style="width:{{prozent_verbraucht}}%; font-size: 16px"">
+    {{prozent_verbraucht}}% der 90 Tage sind aufgebraucht.
+    </div>
   </div>
-</div>
 
-<div class="progress">
-  <div class="progress-bar progress-bar-danger progress-bar-striped active" role="progressbar"
-  aria-valuenow="90" aria-valuemin="0" aria-valuemax="100" style="width:90%">
-    90% Complete (danger)
+  {% elif prozent_verbraucht < 90 %}
+
+  <div class="progress" style="height: 24px;">
+    <div class="progress-bar progress-bar-warning progress-bar-striped active" role="progressbar"
+  aria-valuenow="{{prozent_verbraucht}}" aria-valuemin="0" aria-valuemax="100" style="width:{{prozent_verbraucht}}%; font-size: 16px"">
+    {{prozent_verbraucht}}% der 90 Tage sind aufgebraucht.
+    </div>
   </div>
-</div>
 
-<div class="panel panel-info">
-<div class="panel-heading">Panel Heading</div>
+  {% elif prozent_verbraucht <= 100 %}
+
+  <div class="progress" style="height: 24px;">
+    <div class="progress-bar progress-bar-danger progress-bar-striped active" role="progressbar"
+  aria-valuenow="{{prozent_verbraucht}}" aria-valuemin="0" aria-valuemax="100" style="width:{{prozent_verbraucht}}%; font-size: 16px"">
+    {{prozent_verbraucht}}% der 90 Tage sind aufgebraucht.
+    </div>
+  </div>
+
+  {% else %}
+
+  <div class="progress" style="height: 24px;">
+    <div class="progress-bar progress-bar-danger progress-bar-striped active" role="progressbar"
+  aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width:100%; font-size: 16px"">
+    !! Du hast mehr als 90 Tage verbraucht !!
+    </div>
+  </div>
+
+
+  {% endif %}
+{% endif %}
+
+<div class="panel panel-success">
+<div class="panel-heading">Informationen zu Aufenthalten in der Türkei.</div>
 <div class="panel-body">Deutsche und Schweizer dürfen maximal 90 Tage innerhalb von 180 Tagen ohne Visum in der Türkei zu touristischen Zwecken bleiben. Eine mehrmalige Ein- und Ausreise ist in diesem Zeitraum für kurze Aufenthalte möglich. Dasselbe gilt auch für Österreicher mit einem online Visum.<br><br>90 Tage innerhalb von 180 Tagen: Mehrere kürzere Aufenthalte werden zusammengerechnet! Es ist nicht mehr möglich, für einen Tag aus der Türkei auszureisen um damit einen neuen 90tägigen Aufenthalt zu beginnen! Für den Fall, dass dein Aufenthalt länger als 90 Tage dauert, musst du eine Aufenthaltsgenehmigung beantragen. Sie kann vorab bei einer türkischen Auslandsvertretung beantragt werden (siehe Adresse der Türkischen Botschaft am Ende des Artikels).</div>
 </div>
 
