@@ -63,8 +63,26 @@ def index():
 
 # Register Form Class
 class RegisterForm(Form):
-    email = StringField("E-Mail", [validators.Length(min=4, max=100)])
-    username = StringField("Benutzername", [validators.Length(min=4, max=30)])
+    email = StringField(
+        "E-Mail",
+        [
+            validators.Length(
+                min=4,
+                max=100,
+                message="Bitte eine E-Mail Adresse eingeben (4 bis 100 Zeichen).",
+            )
+        ],
+    )
+    username = StringField(
+        "Benutzername",
+        [
+            validators.Length(
+                min=4,
+                max=30,
+                message="Bitte einen Benutzernamen eingeben (4 bis 30 Zeichen).",
+            )
+        ],
+    )
     password = PasswordField(
         "Passwort",
         [
@@ -375,4 +393,4 @@ class IDGenerator(object):
 
 if __name__ == "__main__":
     app.secret_key = config.SECRET_KEY
-    app.run(debug=True, host="0.0.0.0", port="5000")
+    app.run(debug=True, host="0.0.0.0", port="5050")
