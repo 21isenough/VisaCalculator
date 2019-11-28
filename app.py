@@ -14,11 +14,9 @@ import uuid
 import random
 import config
 from datetime import date, timedelta
+from collections import namedtuple
 
 locale.setlocale(locale.LC_ALL, "de_DE.UTF-8")
-
-
-# from data import Articles
 
 from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
@@ -200,88 +198,51 @@ def aufenthalte():
 
     if result:
 
-        today = date.today()
-        stichtag = date.today() - timedelta(days=180)
         aufenthaltstage = 0
+        today = date.today()
 
-        for aufenthalt in aufenthalte:
-            delta_startdate = (stichtag - aufenthalt["startdate"]).days
-            delta_enddate = (stichtag - aufenthalt["enddate"]).days
+        letztes_ausreisedatum = max(aufenthalt["enddate"] for aufenthalt in aufenthalte)
 
-            if delta_startdate and delta_enddate > 0:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Both dates more than 180 days ago - days don't matter."
-                )
-            elif delta_startdate >= 0 and delta_enddate <= 0:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Enddate matters, less than 180 days ago -> delta_enddate"
-                )
-                aufenthaltstage += (delta_enddate * -1) + 1
-                aufenthalt["relevants"] = (delta_enddate * -1) + 1
-                print(aufenthalt["relevants"])
-            elif delta_startdate == 0 and delta_enddate == 0:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Both dates exactly 180 days ago - count 1 day!"
-                )
-                aufenthaltstage += 1
-            elif 0 >= delta_startdate >= -180 and 0 >= delta_enddate >= -180:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Both dates between 180 days ago  - count duration"
-                )
-                aufenthaltstage += delta_startdate + (delta_enddate * -1) + 1
-            elif delta_startdate >= -180 and delta_enddate <= -180:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Startdate matters, less than 180 days ago -> delta_startdate"
-                )
-                aufenthaltstage += delta_startdate + 181
-                aufenthalt["relevants"] = delta_startdate + 181
-                print(aufenthalt["relevants"])
-            elif delta_startdate == -180 and delta_enddate == -180:
-                print(str(aufenthalt["uid"]) + "Both dates today - count 1 day!")
-                aufenthaltstage += 1
-            elif delta_startdate and delta_enddate < -180:
-                print(
-                    str(aufenthalt["uid"])
-                    + " - Both dates in the future - days don't matter."
-                )
-                print(delta_startdate)
-                print(delta_enddate)
+        if letztes_ausreisedatum <= today:
+            # Datum der letzen Ausreise in der Vergangenheit
+            aufenthaltstage = calculate_aufenthaltstage(aufenthalte, today)
+            stichtag = today - timedelta(days=180)
+            print("Vergangenheit")
+        else:
+            # Datum der letzen Ausreise in der Zukunft
+            aufenthaltstage = calculate_aufenthaltstage(
+                aufenthalte, letztes_ausreisedatum
+            )
+            stichtag = letztes_ausreisedatum - timedelta(days=180)
+            print(stichtag)
+            print("Zukunft")
 
         prozent_verbraucht = round((aufenthaltstage / 90) * 100)
 
+        ### Add function that changes the "relevants" of enddates if needed
+
+        # Separate the events into past and future events
         vergangene_aufenthalte = []
         zukuenftige_aufenthalte = []
-        days_zukuenftige_aufenthalte = 0
-        days_vergangene_aufenthalte = 0
 
         for aufenthalt in aufenthalte:
-            startdate_heute = (date.today() - aufenthalt["startdate"]).days
-            enddate_heute = (date.today() - aufenthalt["enddate"]).days
-            print(startdate_heute)
-            print(enddate_heute)
+            startdate_heute = (today - aufenthalt["startdate"]).days
+            enddate_heute = (today - aufenthalt["enddate"]).days
 
             if startdate_heute <= 0 and enddate_heute <= 0:
                 zukuenftige_aufenthalte.append(aufenthalt)
                 duration = (aufenthalt["enddate"] - aufenthalt["startdate"]).days
-                days_zukuenftige_aufenthalte += duration
-                days_zukuenftige_aufenthalte += 1
+
             else:
                 vergangene_aufenthalte.append(aufenthalt)
                 duration = (aufenthalt["enddate"] - aufenthalt["startdate"]).days
-                days_vergangene_aufenthalte += duration
-                days_vergangene_aufenthalte += 1
+
+        cur.close()
 
         return render_template(
             "aufenthalte.html",
             vergangene_aufenthalte=vergangene_aufenthalte,
             zukuenftige_aufenthalte=zukuenftige_aufenthalte,
-            days_zukuenftige_aufenthalte=days_zukuenftige_aufenthalte,
-            days_vergangene_aufenthalte=days_vergangene_aufenthalte,
             stichtag=stichtag,
             aufenthaltstage=aufenthaltstage,
             prozent_verbraucht=prozent_verbraucht,
@@ -294,7 +255,25 @@ def aufenthalte():
     cur.close()
 
 
-# Add aufenthalt
+def calculate_aufenthaltstage(aufenthalte, referenztag=date.today()):
+    Range = namedtuple("Range", ["startdate", "enddate"])
+    aufenthaltstage = 0
+
+    for aufenthalt in aufenthalte:
+        range1 = Range(
+            startdate=(referenztag - timedelta(days=180)), enddate=referenztag
+        )
+        range2 = Range(startdate=aufenthalt["startdate"], enddate=aufenthalt["enddate"])
+        latest_start = max(range1.startdate, range2.startdate)
+        earliest_end = min(range1.enddate, range2.enddate)
+        delta = (earliest_end - latest_start).days + 1
+        overlap = max(0, delta)
+        aufenthaltstage += overlap
+
+    return aufenthaltstage
+
+
+# Add Aufenthalt
 @app.route("/aufenthalt_hinzufuegen", methods=["GET", "POST"])
 @is_logged_in
 def aufenthalt_hinzufuegen():
@@ -304,13 +283,19 @@ def aufenthalt_hinzufuegen():
         enddate = form.enddate.data
         comment = form.comment.data
 
+        ### Todos - Detect if overlap with existing dates
+
+        # Detect backward dates entered
         if startdate > enddate:
             flash("Das Einreisedatum muss vor dem Ausreisedatum liegen.", "danger")
             return redirect(url_for("aufenthalt_hinzufuegen"))
-        if ((date.today() - enddate).days) <= 0:
-            print(enddate - date.today())
-            flash("Das Ausreisedatum muss in der Vergangenheit liegen.", "danger")
-            return redirect(url_for("aufenthalt_hinzufuegen"))
+
+        # if ((date.today() - enddate).days) <= 0:
+        #     print(enddate - date.today())
+        #     flash("Das Ausreisedatum muss in der Vergangenheit liegen.", "danger")
+        #     return redirect(url_for("aufenthalt_hinzufuegen"))
+
+        # Restrict timedelta to max 90 days
         if (enddate - startdate).days > 90:
             flash(
                 "Der Zeitraum zwischen den beiden Daten darf nicht mehr als 90 Tage betragen.",
