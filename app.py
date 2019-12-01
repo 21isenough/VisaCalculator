@@ -41,16 +41,16 @@ mysql = MySQL(app)
 # Articles = Articles()
 
 # Check if user is logged in
-def is_logged_in(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
+def is_logged_in(func):
+    @wraps(func)
+    def secure_login():
         if "logged_in" in session:
-            return f(*args, **kwargs)
+            return func()
         else:
             flash("Zugriff nicht gestattet, bitte einloggen.", "danger")
             return redirect(url_for("login"))
 
-    return wrap
+    return secure_login
 
 
 # Index
@@ -335,11 +335,6 @@ def aufenthalt_hinzufuegen():
             return redirect(url_for("aufenthalt_hinzufuegen"))
         # Close connection
         cur.close()
-
-        # if ((date.today() - enddate).days) <= 0:
-        #     print(enddate - date.today())
-        #     flash("Das Ausreisedatum muss in der Vergangenheit liegen.", "danger")
-        #     return redirect(url_for("aufenthalt_hinzufuegen"))
 
         # Create cursor
         cur = mysql.connection.cursor()
