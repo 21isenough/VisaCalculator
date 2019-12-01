@@ -280,6 +280,19 @@ def aufenthalt_hinzufuegen():
         enddate = form.enddate.data
         comment = form.comment.data
 
+        # Detect backward dates entered
+        if startdate > enddate:
+            flash("Das Einreisedatum muss vor dem Ausreisedatum liegen.", "danger")
+            return redirect(url_for("aufenthalt_hinzufuegen"))
+
+        # Restrict timedelta to max 90 days
+        if (enddate - startdate).days > 90:
+            flash(
+                "Der Zeitraum zwischen den beiden Daten darf nicht mehr als 90 Tage betragen.",
+                "danger",
+            )
+            return redirect(url_for("aufenthalt_hinzufuegen"))
+
         # Create cursor
         cur = mysql.connection.cursor()
 
@@ -293,6 +306,7 @@ def aufenthalt_hinzufuegen():
         Range = namedtuple("Range", ["startdate", "enddate"])
 
         # Detect if overlap with existing dates
+        overlap = 0
         if result:
             for aufenthalt in aufenthalte:
                 range1 = Range(startdate=startdate, enddate=enddate)
@@ -303,27 +317,21 @@ def aufenthalt_hinzufuegen():
                 earliest_end = min(range1.enddate, range2.enddate)
                 delta = (earliest_end - latest_start).days + 1
                 overlap += max(0, delta)
-            print()
-        if overlap
 
-
-        # Detect backward dates entered
-        if startdate > enddate:
-            flash("Das Einreisedatum muss vor dem Ausreisedatum liegen.", "danger")
+        if overlap > 0:
+            flash(
+                "Es exisitert bereits mindestens ein Aufenthalt der sich mit diesem überschneiden würde.",
+                "danger",
+            )
             return redirect(url_for("aufenthalt_hinzufuegen"))
+        # Close connection
+        cur.close()
 
         # if ((date.today() - enddate).days) <= 0:
         #     print(enddate - date.today())
         #     flash("Das Ausreisedatum muss in der Vergangenheit liegen.", "danger")
         #     return redirect(url_for("aufenthalt_hinzufuegen"))
 
-        # Restrict timedelta to max 90 days
-        if (enddate - startdate).days > 90:
-            flash(
-                "Der Zeitraum zwischen den beiden Daten darf nicht mehr als 90 Tage betragen.",
-                "danger",
-            )
-            return redirect(url_for("aufenthalt_hinzufuegen"))
         # Create cursor
         cur = mysql.connection.cursor()
 
