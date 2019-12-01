@@ -173,12 +173,9 @@ def logout():
 
 # Trip Form Class
 class TripForm(Form):
-    startdate = DateField("Einreisedatum")
-    enddate = DateField("Ausreisedatum")
+    startdate = DateField("Einreisedatum")  # format="%Y-%m-%d")
+    enddate = DateField("Ausreisedatum")  # format="%Y-%m-%d")
     comment = StringField("Kommentar")
-    # startdate = DateField("Einreisedatum", format="%Y-%m-%d")
-    # enddate = DateField("Ausreisedatum", format="%Y-%m-%d")
-    # comment = StringField("Kommentar", [validators.Length(max=255)])
 
 
 # Trip overview
@@ -283,7 +280,32 @@ def aufenthalt_hinzufuegen():
         enddate = form.enddate.data
         comment = form.comment.data
 
-        ### Todos - Detect if overlap with existing dates
+        # Create cursor
+        cur = mysql.connection.cursor()
+
+        app.logger.info(session["id"])
+        result = cur.execute(
+            "SELECT * FROM aufenthalte WHERE owner = %s ORDER BY startdate ASC",
+            [session["id"]],
+        )
+
+        aufenthalte = cur.fetchall()
+        Range = namedtuple("Range", ["startdate", "enddate"])
+
+        # Detect if overlap with existing dates
+        if result:
+            for aufenthalt in aufenthalte:
+                range1 = Range(startdate=startdate, enddate=enddate)
+                range2 = Range(
+                    startdate=aufenthalt["startdate"], enddate=aufenthalt["enddate"]
+                )
+                latest_start = max(range1.startdate, range2.startdate)
+                earliest_end = min(range1.enddate, range2.enddate)
+                delta = (earliest_end - latest_start).days + 1
+                overlap += max(0, delta)
+            print()
+        if overlap
+
 
         # Detect backward dates entered
         if startdate > enddate:
