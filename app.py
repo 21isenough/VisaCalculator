@@ -197,23 +197,29 @@ def aufenthalte():
 
         aufenthaltstage = 0
         today = date.today()
+        planungsart = ""
 
         letztes_ausreisedatum = max(aufenthalt["enddate"] for aufenthalt in aufenthalte)
 
         if letztes_ausreisedatum <= today:
-            # Datum der letzen Ausreise in der Vergangenheit
+            # Festellen ob Datum der letzen Ausreise in der Vergangenheit
+            # Berechnet den Stichtag, welcher 180 Tag in der Vergangenheit liegt (von heute)
             aufenthaltstage = calculate_aufenthaltstage(aufenthalte, today)
             stichtag = today - timedelta(days=180)
+            planungsart = "Vergangenheit"
             print("Vergangenheit")
         else:
-            # Datum der letzen Ausreise in der Zukunft
+            # Festellen ob Datum der letzen Ausreise in der Zukunft
+            # Berechnet den Stichtag, welcher 180 hinter dem letzten Ausreisedatum liegt
             aufenthaltstage = calculate_aufenthaltstage(
                 aufenthalte, letztes_ausreisedatum
             )
             stichtag = letztes_ausreisedatum - timedelta(days=180)
+            planungsart = "Zukunft"
             print(stichtag)
             print("Zukunft")
 
+        # Berechnet die Anzahl "verbrauchter/verplanter" Tage (von 90 erlaubten Tagen)
         prozent_verbraucht = round((aufenthaltstage / 90) * 100)
 
         ### Add function that changes the "relevants" of enddates if needed
@@ -244,6 +250,8 @@ def aufenthalte():
             aufenthaltstage=aufenthaltstage,
             prozent_verbraucht=prozent_verbraucht,
             today=today,
+            planungsart=planungsart,
+            letztes_ausreisedatum=letztes_ausreisedatum,
         )
     else:
         msg = "Keine Aufenthalt gefunden..."
@@ -293,6 +301,8 @@ def aufenthalt_hinzufuegen():
             )
             return redirect(url_for("aufenthalt_hinzufuegen"))
 
+        # Detect if overlap with existing dates
+
         # Create cursor
         cur = mysql.connection.cursor()
 
@@ -305,7 +315,6 @@ def aufenthalt_hinzufuegen():
         aufenthalte = cur.fetchall()
         Range = namedtuple("Range", ["startdate", "enddate"])
 
-        # Detect if overlap with existing dates
         overlap = 0
         if result:
             for aufenthalt in aufenthalte:
