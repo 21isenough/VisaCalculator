@@ -43,9 +43,9 @@ mysql = MySQL(app)
 # Check if user is logged in
 def is_logged_in(func):
     @wraps(func)
-    def secure_login():
+    def secure_login(*args, **kwargs):
         if "logged_in" in session:
-            return func()
+            return func(*args, **kwargs)
         else:
             flash("Zugriff nicht gestattet, bitte einloggen.", "danger")
             return redirect(url_for("login"))
